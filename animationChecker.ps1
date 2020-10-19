@@ -17,6 +17,7 @@
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.IO
 Add-Type -AssemblyName System.IO.Compression.FileSystem
+Add-Type -AssemblyName Microsoft.VisualBasic
 
 $script:j = 0
 
@@ -52,7 +53,7 @@ function Read-FileInZip($ZipFilePath, $FilePathInZip) {
 }
 
 
-#This function will get a list of files inside zips to process when mulitple are selected
+#This function will process a list of zip files, and call the Test-HTML  
 function get-MultipleLesson($fileList){
     $zippedAni = New-Object System.Collections.Generic.List[System.Object]
 
@@ -87,9 +88,6 @@ function get-MultipleLesson($fileList){
     $PBarPercent = 0
     $ProgressBar1.Value = 0
 
-    
-    
-
     for ($i = 0; $i -lt $zippedAni.Count; $i++) {
 
         $pBarCount++
@@ -115,6 +113,38 @@ function get-MultipleLesson($fileList){
     }
 }
 
+#Find the Captivate preview temp html folder, and call test-HTML for each HTML5 Animation
+function get-HtmlPreview($path){
+    $subValue = $path.indexof("HTML5") 
+    $searchPath = $path.Substring($subValue)
+    $subValue = $searchPath.indexof("/")
+    $searchPath = $searchPath.Substring(0, $subValue)
+ 
+    $lessonPath = Get-ChildItem -Path $env:TEMP -recurse | Where-Object {$_.name -like $searchPath}
+
+    $lessonHtml = Get-Content ($lessonpath.FullName + '\index.html')
+    $lessonTitle = [regex]::Match($lessonHtml, '<title>(?<title>.*)<\/title>')
+    if($lessonTitle.Success){
+        $OutputTextBox.AppendText("`r`nProcessing Captivate HTML5 Preview for " + $lessonTitle.Groups['title'].value + ". Please wait...")
+    } else {
+        $OutputTextBox.AppendText("`r`nProcessing Captivate HTML5 Preview. Please wait...")
+    }
+
+    $webObjects = Get-ChildItem -Path ($lessonPath.FullName + "\wor") -Recurse -Filter "*.html" | Where-Object {$_.FullName -match '(?!\S*xlp)(?!\S*index)wor.*\.html?'}
+
+    foreach ($file in $webObjects){
+        $htmlData = Get-Content $file.FullName
+
+        test-html $htmlData $file.name $j
+    }
+
+    switch ($script:j) {
+        0       {$OutputTextBox.AppendText("`r`nAnalysis complete. No animations need to be corrected.")}
+        1       {$OutputTextBox.AppendText("`r`nAnalysis complete. $script:j animation needs to be corrected.")}
+        default {$OutputTextBox.AppendText("`r`nAnalysis complete. $script:j animations need to be corrected.")}
+    }
+}
+
 #This checks an HTML file for a
 function test-HTML($htmlData, $htmlName, $j) {
 
@@ -128,32 +158,36 @@ function test-HTML($htmlData, $htmlName, $j) {
 function test-Animation {
     $script:j = 0
 
-    $itemsToBeConverted = $pathTextBox.text.split(";")
-    
-    if($itemsToBeConverted.Count -le 0){
-        $OutputTextBox.AppendText("`r`nSource path not valid.")
-        break
-    } 
-    
-    if ($itemsToBeConverted.Count -gt 1){
-        get-MultipleLesson $itemsToBeConverted
-
-    } elseif ($itemsToBeConverted.Count -eq 1) {
-
-        if($itemsToBeConverted -like "*.zip"){
+    if($pathTextBox.text -like "*.html"){
+        get-HtmlPreview($pathTextBox.text)
+    } else {
+        $itemsToBeConverted = $pathTextBox.text.split(";")
+        
+        if($itemsToBeConverted.Count -le 0){
+            $OutputTextBox.AppendText("`r`nSource path not valid.")
+            break
+        } 
+        
+        if ($itemsToBeConverted.Count -gt 1){
             get-MultipleLesson $itemsToBeConverted
 
-        } else {
-            $matchedFiles = Get-ChildItem $itemsToBeConverted -Include "*.zip" -Recurse
-            $fileList = @()
+        } elseif ($itemsToBeConverted.Count -eq 1) {
 
-            foreach($file in $matchedFiles){
-                $fileList += $file.FullName
+            if($itemsToBeConverted -like "*.zip"){
+                get-MultipleLesson $itemsToBeConverted
+
+            } else {
+                $matchedFiles = Get-ChildItem $itemsToBeConverted -Include "*.zip" -Recurse
+                $fileList = @()
+
+                foreach($file in $matchedFiles){
+                    $fileList += $file.FullName
+                }
+
+                get-MultipleLesson $fileList
             }
-
-            get-MultipleLesson $fileList
         }
-}
+    }
  }
  
 function get-SourceFolderDialog {
@@ -182,6 +216,16 @@ function get-SourceFileDialog {
     $sourceFile = $sourceFile.trimend(";")
     }
     $pathTextBox.text = $sourceFile
+
+    if ($pathTextBox.text.length -gt 0) {
+        $analyzeButton.enabled = $true
+    }
+}
+
+function get-SourceHtmlDialog {
+    $title = 'HTML5 Animation Test Path'
+    $msg = "Enter the full URL from the Captivate HTML5 preview broswer window."
+    $pathTextBox.text = [Microsoft.VisualBasic.Interaction]::InputBox($msg, $title)
 
     if ($pathTextBox.text.length -gt 0) {
         $analyzeButton.enabled = $true
@@ -222,116 +266,126 @@ $AnimationChecker.TopMost          = $false
 $AnimationChecker.MaximizeBox      = $false
 $AnimationChecker.FormBorderStyle  = "Fixed3D"
 
-$inputGroupBox                      = New-Object system.Windows.Forms.Groupbox
-$inputGroupBox.height               = 90
-$inputGroupBox.width                = 378
-$inputGroupBox.location             = New-Object System.Drawing.Point(9,107)
+$inputGroupBox                     = New-Object system.Windows.Forms.Groupbox
+$inputGroupBox.height              = 120
+$inputGroupBox.width               = 378
+$inputGroupBox.location            = New-Object System.Drawing.Point(9,75)
 
-$outputGroupBox                     = New-Object system.Windows.Forms.Groupbox
-$outputGroupBox.height              = 45
-$outputGroupBox.width               = 378
-$outputGroupBox.location            = New-Object System.Drawing.Point(9,200)
+$outputGroupBox                    = New-Object system.Windows.Forms.Groupbox
+$outputGroupBox.height             = 45
+$outputGroupBox.width              = 378
+$outputGroupBox.location           = New-Object System.Drawing.Point(9,200)
 
-$fileBroswerButton                  = New-Object system.Windows.Forms.Button
+$fileBroswerButton                 = New-Object system.Windows.Forms.Button
 #$fileBroswerButton.BackColor        = "#4a4a4a"
-$fileBroswerButton.text             = "Select package to check"
-$fileBroswerButton.width            = 173
-$fileBroswerButton.height           = 30
-$fileBroswerButton.location         = New-Object System.Drawing.Point(14,18)
-$fileBroswerButton.Font             = 'Microsoft Sans Serif,10'
+$fileBroswerButton.text            = "Select package"
+$fileBroswerButton.width           = 173
+$fileBroswerButton.height          = 30
+$fileBroswerButton.location        = New-Object System.Drawing.Point(14,18)
+$fileBroswerButton.Font            = 'Microsoft Sans Serif,10'
 #$fileBroswerButton.ForeColor        = "#ffffff"
 
-$pathTextBox                        = New-Object system.Windows.Forms.TextBox
-$pathTextBox.multiline              = $false
-#$pathTextBox.BackColor              = "#2a2a2a"
-$pathTextBox.width                  = 353
-$pathTextBox.height                 = 30
-$pathTextBox.location               = New-Object System.Drawing.Point(14,57)
-$pathTextBox.Font                   = 'Microsoft Sans Serif,10'
-#$pathTextBox.ForeColor              = "#ffffff"
-$pathTextBox.ReadOnly               = $true
+$folderBroswerButton               = New-Object system.Windows.Forms.Button
+#$folderBroswerButton.BackColor     = "#4a4a4a"
+$folderBroswerButton.text          = "Select folder"
+$folderBroswerButton.width         = 171
+$folderBroswerButton.height        = 30
+$folderBroswerButton.location      = New-Object System.Drawing.Point(196,18)
+$folderBroswerButton.Font          = 'Microsoft Sans Serif,10'
+#$folderBroswerButton.ForeColor     = "#ffffff"
 
-$analyzeButton                       = New-Object system.Windows.Forms.Button
-#$analyzeButton.BackColor             = "#4a4a4a"
-$analyzeButton.text                  = "Check animation files"
-$analyzeButton.width                 = 353
-$analyzeButton.height                = 30
-$analyzeButton.enabled               = $false
-$analyzeButton.location              = New-Object System.Drawing.Point(15,10)
-$analyzeButton.Font                  = 'Microsoft Sans Serif,10'
-#$analyzeButton.ForeColor             = "#ffffff"
+$html5BroswerButton                = New-Object system.Windows.Forms.Button
+#$html5BroswerButton.BackColor     = "#4a4a4a"
+$html5BroswerButton.text           = "Select HTML5 Preview"
+$html5BroswerButton.width          = 171
+$html5BroswerButton.height         = 30
+$html5BroswerButton.location       = New-Object System.Drawing.Point(106,52)
+$html5BroswerButton.Font           = 'Microsoft Sans Serif,10'
+#$html5BroswerButton.ForeColor      = "#ffffff"
 
-$Groupbox1                           = New-Object system.Windows.Forms.Groupbox
-$Groupbox1.height                    = 244
-$Groupbox1.width                     = 378
-$Groupbox1.text                      = "Output"
-$Groupbox1.location                  = New-Object System.Drawing.Point(10,255)
+$pathTextBox                       = New-Object system.Windows.Forms.TextBox
+$pathTextBox.multiline             = $false
+#$pathTextBox.BackColor             = "#2a2a2a"
+$pathTextBox.width                 = 353
+$pathTextBox.height                = 30
+$pathTextBox.location              = New-Object System.Drawing.Point(14,87)
+$pathTextBox.Font                  = 'Microsoft Sans Serif,10'
+#$pathTextBox.ForeColor             = "#ffffff"
+$pathTextBox.ReadOnly              = $true
 
-$ProgressBar1                        = New-Object system.Windows.Forms.ProgressBar
-#$ProgressBar1.BackColor              = "#7ed321"
-$ProgressBar1.width                  = 356
-$ProgressBar1.height                 = 17
-$ProgressBar1.location               = New-Object System.Drawing.Point(10,20) 
-$ProgressBar1.Value                  = 0
-$ProgressBar1.Style                  = "Continuous"
+$analyzeButton                     = New-Object system.Windows.Forms.Button
+#$analyzeButton.BackColor           = "#4a4a4a"
+$analyzeButton.text                = "Check animation files"
+$analyzeButton.width               = 353
+$analyzeButton.height              = 30
+$analyzeButton.enabled             = $false
+$analyzeButton.location            = New-Object System.Drawing.Point(15,10)
+$analyzeButton.Font                = 'Microsoft Sans Serif,10'
+#$analyzeButton.ForeColor           = "#ffffff"
 
-$OutputTextBox                        = New-Object system.Windows.Forms.TextBox
-$OutputTextBox.multiline              = $true
-$OutputTextBox.ScrollBars             = "Vertical"
-#$OutputTextBox.BackColor              = "#2a2a2a"
-$OutputTextBox.width                  = 356
-$OutputTextBox.height                 = 150
-$OutputTextBox.location               = New-Object System.Drawing.Point(10,42)
-$OutputTextBox.Font                   = 'Microsoft Sans Serif,10'
-#$OutputTextBox.ForeColor              = "#ffffff"
-$OutputTextBox.ReadOnly               = $true
+$Groupbox1                         = New-Object system.Windows.Forms.Groupbox
+$Groupbox1.height                  = 244
+$Groupbox1.width                   = 378
+$Groupbox1.text                    = "Output"
+$Groupbox1.location                = New-Object System.Drawing.Point(10,255)
 
-$copyLogButton                  = New-Object system.Windows.Forms.Button
-$copyLogButton.text             = "Copy results"
-$copyLogButton.width            = 100
-$copyLogButton.height           = 30
-$copyLogButton.location         = New-Object System.Drawing.Point(10,202)
-$copyLogButton.Font             = 'Microsoft Sans Serif,10'
+$ProgressBar1                      = New-Object system.Windows.Forms.ProgressBar
+#$ProgressBar1.BackColor            = "#7ed321"
+$ProgressBar1.width                = 356
+$ProgressBar1.height               = 17
+$ProgressBar1.location             = New-Object System.Drawing.Point(10,20) 
+$ProgressBar1.Value                = 0
+$ProgressBar1.Style                = "Continuous"
 
-$saveLogButton                  = New-Object system.Windows.Forms.Button
-$saveLogButton.text             = "Save results"
-$saveLogButton.width            = 100
-$saveLogButton.height           = 30
-$saveLogButton.location         = New-Object System.Drawing.Point(140,202)
-$saveLogButton.Font             = 'Microsoft Sans Serif,10'
+$OutputTextBox                     = New-Object system.Windows.Forms.TextBox
+$OutputTextBox.multiline           = $true
+$OutputTextBox.ScrollBars          = "Vertical"
+#$OutputTextBox.BackColor           = "#2a2a2a"
+$OutputTextBox.width               = 356
+$OutputTextBox.height              = 150
+$OutputTextBox.location            = New-Object System.Drawing.Point(10,42)
+$OutputTextBox.Font                = 'Microsoft Sans Serif,10'
+#$OutputTextBox.ForeColor           = "#ffffff"
+$OutputTextBox.ReadOnly            = $true
 
-$clearLogButton                  = New-Object system.Windows.Forms.Button
-$clearLogButton.text             = "Clear log"
-$clearLogButton.width            = 100
-$clearLogButton.height           = 30
-$clearLogButton.location         = New-Object System.Drawing.Point(265,202)
-$clearLogButton.Font             = 'Microsoft Sans Serif,10'
+$copyLogButton                     = New-Object system.Windows.Forms.Button
+$copyLogButton.text                = "Copy results"
+$copyLogButton.width               = 100
+$copyLogButton.height              = 30
+$copyLogButton.location            = New-Object System.Drawing.Point(10,202)
+$copyLogButton.Font                = 'Microsoft Sans Serif,10'
 
-$folderBroswerButton                  = New-Object system.Windows.Forms.Button
-#$folderBroswerButton.BackColor        = "#4a4a4a"
-$folderBroswerButton.text             = "Select a folder to check"
-$folderBroswerButton.width            = 171
-$folderBroswerButton.height           = 30
-$folderBroswerButton.location         = New-Object System.Drawing.Point(196,18)
-$folderBroswerButton.Font             = 'Microsoft Sans Serif,10'
-#$folderBroswerButton.ForeColor        = "#ffffff"
+$saveLogButton                     = New-Object system.Windows.Forms.Button
+$saveLogButton.text                = "Save results"
+$saveLogButton.width               = 100
+$saveLogButton.height              = 30
+$saveLogButton.location            = New-Object System.Drawing.Point(140,202)
+$saveLogButton.Font                = 'Microsoft Sans Serif,10'
 
-$Label1                               = New-Object system.Windows.Forms.Label
-$Label1.text                          = "This tool checks animations in published Captivate lesson packages (zip). The program may appear to lock up when processing large numbers of zip files over the network, however it will complete. You can also copy the files to your local machine and try again."
-$Label1.AutoSize                      = $false
-$Label1.width                         = 380
-$Label1.height                        = 100
-$Label1.location                      = New-Object System.Drawing.Point(10,12)
-$Label1.Font                          = 'Microsoft Sans Serif,10'
-#$Label1.ForeColor                     = "#ffffff"
+$clearLogButton                    = New-Object system.Windows.Forms.Button
+$clearLogButton.text               = "Clear log"
+$clearLogButton.width              = 100
+$clearLogButton.height             = 30
+$clearLogButton.location           = New-Object System.Drawing.Point(265,202)
+$clearLogButton.Font               = 'Microsoft Sans Serif,10'
+
+$Label1                            = New-Object system.Windows.Forms.Label
+$Label1.text                       = "This tool checks animations in published Captivate lesson packages (zip) or in local Captivate previews (url). Previews in Captivate must be generated using the HTML5 in Broswer option."
+$Label1.AutoSize                   = $false
+$Label1.width                      = 380
+$Label1.height                     = 100
+$Label1.location                   = New-Object System.Drawing.Point(10,12)
+$Label1.Font                       = 'Microsoft Sans Serif,10'
+#$Label1.ForeColor                  = "#ffffff"
 
 $AnimationChecker.controls.AddRange(@($inputGroupBox,$outputGroupBox,$Groupbox1,$Label1))
-$inputGroupBox.controls.AddRange(@($fileBroswerButton,$pathTextBox,$folderBroswerButton))
+$inputGroupBox.controls.AddRange(@($fileBroswerButton,$pathTextBox,$folderBroswerButton,$html5BroswerButton))
 $outputGroupBox.controls.AddRange(@($analyzeButton))
 $Groupbox1.controls.AddRange(@($ProgressBar1,$OutputTextBox,$copyLogButton,$saveLogButton,$clearLogButton))
 
 $fileBroswerButton.Add_Click({ get-SourceFileDialog })
 $folderBroswerButton.Add_Click({ get-SourceFolderDialog })
+$html5BroswerButton.Add_Click({ get-SourceHtmlDialog })
 $analyzeButton.Add_Click({ test-Animation })
 $copyLogButton.Add_Click({ copy-log })
 $saveLogButton.Add_Click({ save-log })
@@ -340,5 +394,5 @@ $clearLogButton.Add_Click({ clear-log })
 
 #endregion GUI
 
-#Write your logic code here
+#Call the form
 [void]$AnimationChecker.ShowDialog()
