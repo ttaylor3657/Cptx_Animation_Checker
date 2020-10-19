@@ -131,7 +131,7 @@ function get-HtmlPreview($path){
     }
 
     $webObjects = Get-ChildItem -Path ($lessonPath.FullName + "\wor") -Recurse -Filter "*.html" | Where-Object {$_.FullName -match '(?!\S*xlp)(?!\S*index)wor.*\.html?'}
-
+    $OutputTextBox.AppendText("`r`nAnalyzing " + $webObjects.count + " animations. Please wait...")
     foreach ($file in $webObjects){
         $htmlData = Get-Content $file.FullName
 
