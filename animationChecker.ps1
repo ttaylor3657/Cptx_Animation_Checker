@@ -1,9 +1,9 @@
 # *************************************************************************
 #
 # Script Name: Animation Checker
-# Version: 0.1
+# Version: 1.0
 # Author: Jeff Taylor
-# Date: 5/14/2020
+# Date: 10/20/2020
 #
 # Description: Run script and it will open a GUI. Select a lesson package that cotains
 # HTML5 animations. A report will be generated with a list of animations that do not inlcude
