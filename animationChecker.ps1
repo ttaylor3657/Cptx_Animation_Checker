@@ -103,7 +103,7 @@ function get-MultipleLesson($fileList){
             $OutputTextBox.AppendText($zipName)
         }
         
-        test-HTML $myHtml $currentListItem[1] #$j
+        test-HTML $myHtml $currentListItem[1] 
 
     }
     switch ($script:j) {
@@ -142,7 +142,7 @@ function get-HtmlPreview($path){
 
         $htmlData = Get-Content $webObjects[$i].FullName
 
-        test-html $htmlData $webObjects[$i].name #$j
+        test-html $htmlData $webObjects[$i].name 
     }
 
     switch ($script:j) {
@@ -153,7 +153,7 @@ function get-HtmlPreview($path){
 }
 
 #This checks an HTML file for a
-function test-HTML($htmlData, $htmlName){#, $j) {
+function test-HTML($htmlData, $htmlName){
 
     if($htmlData -match ("https://code.createjs.com/")){
         $OutputTextBox.AppendText("`r`n     $htmlName will not work in the learning center.")
