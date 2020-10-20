@@ -7,7 +7,7 @@
 #
 # Description: Run script and it will open a GUI. Select a lesson package that cotains
 # HTML5 animations. A report will be generated with a list of animations that do not inlcude
-# the proper javascript in the file, and use the hosted version. These can then be corrected
+# the proper javascript in the file, and use the web hosted version. These can then be corrected
 # by the artists and/or programmer.
 #
 #   WARNING: Nested zip files are no supported!
@@ -103,7 +103,7 @@ function get-MultipleLesson($fileList){
             $OutputTextBox.AppendText($zipName)
         }
         
-        test-HTML $myHtml $currentListItem[1] $j
+        test-HTML $myHtml $currentListItem[1] #$j
 
     }
     switch ($script:j) {
@@ -132,10 +132,17 @@ function get-HtmlPreview($path){
 
     $webObjects = Get-ChildItem -Path ($lessonPath.FullName + "\wor") -Recurse -Filter "*.html" | Where-Object {$_.FullName -match '(?!\S*xlp)(?!\S*index)wor.*\.html?'}
     $OutputTextBox.AppendText("`r`nAnalyzing " + $webObjects.count + " animations. Please wait...")
-    foreach ($file in $webObjects){
-        $htmlData = Get-Content $file.FullName
+    
+    
+    for ($i = 0; $i -lt $webObjects.Count; $i++) {
 
-        test-html $htmlData $file.name $j
+        $pBarCount++
+        $PBarPercent = ($pBarCount/$webObjects.Count) * 100
+        $ProgressBar1.Value = $PBarPercent
+
+        $htmlData = Get-Content $webObjects[$i].FullName
+
+        test-html $htmlData $webObjects[$i].name #$j
     }
 
     switch ($script:j) {
@@ -146,7 +153,7 @@ function get-HtmlPreview($path){
 }
 
 #This checks an HTML file for a
-function test-HTML($htmlData, $htmlName, $j) {
+function test-HTML($htmlData, $htmlName){#, $j) {
 
     if($htmlData -match ("https://code.createjs.com/")){
         $OutputTextBox.AppendText("`r`n     $htmlName will not work in the learning center.")
