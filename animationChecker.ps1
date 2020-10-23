@@ -120,7 +120,7 @@ function get-HtmlPreview($path){
     $subValue = $searchPath.indexof("/")
     $searchPath = $searchPath.Substring(0, $subValue)
  
-    $lessonPath = Get-ChildItem -Path $env:TEMP -recurse | Where-Object {$_.name -like $searchPath}
+    $lessonPath = Get-ChildItem -Path $env:TEMP -recurse -ErrorAction SilentlyContinue | Where-Object {$_.name -like $searchPath}
 
     $lessonHtml = Get-Content ($lessonpath.FullName + '\index.html')
     $lessonTitle = [regex]::Match($lessonHtml, '<title>(?<title>.*)<\/title>')
